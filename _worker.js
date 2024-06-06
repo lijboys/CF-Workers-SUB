@@ -95,7 +95,7 @@ export default {
 	
 			const timeout = setTimeout(() => {
 				controller.abort(); // 取消所有请求
-			}, 1618); // 1.618秒后触发
+			}, 2000); // 2秒后触发
 	
 
 			let 追加UA = 'v2rayn';
@@ -121,7 +121,7 @@ export default {
 								if (content.includes('dns') && content.includes('proxies') && content.includes('proxy-groups')) {
 									//console.log("clashsub: " + url);
 									订阅转换URL += "|" + url;
-								} else if  (content.includes('dns') && content.includes('outbounds') && content.includes('inbounds')){
+								} else if (content.includes('dns') && content.includes('outbounds') && content.includes('inbounds')){
 									//console.log("singboxsub: " + url);
 									订阅转换URL += "|" + url;
 								} else {
@@ -135,14 +135,14 @@ export default {
 						}
 					})
 				));	
-				//console.log(responses);
+			
 				for (const response of responses) {
-					if (response.status === 'fulfilled') {
-						const content = await response.value;
+					if (response.status === 'fulfilled' && response.value) {
+						const content = response.value;
 						req_data += base64Decode(content) + '\n';
 					}
 				}
-
+			
 			} catch (error) {
 				//console.error(error);
 			} finally {
@@ -162,7 +162,7 @@ export default {
 			
 			const base64Data = btoa(result);
 
-			if (订阅格式 == 'base64'){
+			if (订阅格式 == 'base64' || token == fakeToken){
 				return new Response(base64Data ,{
 					headers: { 
 						"content-type": "text/plain; charset=utf-8",
@@ -190,7 +190,7 @@ export default {
 					//throw new Error(`Error fetching subconverterUrl: ${subconverterResponse.status} ${subconverterResponse.statusText}`);
 				}
 				let subconverterContent = await subconverterResponse.text();
-	
+				if (订阅格式 == 'clash') subconverterContent =await clashFix(subconverterContent);
 				return new Response(subconverterContent, {
 					headers: { 
 						"Content-Disposition": `attachment; filename*=utf-8''${encodeURIComponent(FileName)}; filename=${FileName}`,
@@ -295,4 +295,29 @@ async function MD5MD5(text) {
 	const secondHex = secondPassArray.map(b => b.toString(16).padStart(2, '0')).join('');
   
 	return secondHex.toLowerCase();
+}
+
+function clashFix(content) {
+	if(content.includes('wireguard') && !content.includes('remote-dns-resolve')){
+		let lines;
+		if (content.includes('\r\n')){
+			lines = content.split('\r\n');
+		} else {
+			lines = content.split('\n');
+		}
+	
+		let result = "";
+		for (let line of lines) {
+			if (line.includes('type: wireguard')) {
+				const 备改内容 = `, mtu: 1280, udp: true`;
+				const 正确内容 = `, mtu: 1280, remote-dns-resolve: true, udp: true`;
+				result += line.replace(new RegExp(备改内容, 'g'), 正确内容) + '\n';
+			} else {
+				result += line + '\n';
+			}
+		}
+
+		content = result;
+	}
+	return content;
 }
